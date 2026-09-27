@@ -2279,7 +2279,6 @@ function OwnerScreen({ t, lang, dir, onBack }) {
    plus (owner-only) a compose box and inbox of user messages.
    ============================================================ */
 function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, ownerEmail, inbox = [], onBack, onSendBroadcast, onSendToOwner, onUpdateOwnerEmail, onSendToMother, onOpenOwner }) {
-  const Back = lang === "ar" ? ArrowRight : ArrowLeft;
   const [bTitle, setBTitle] = useState("");
   const [bText, setBText] = useState("");
   const [myMsg, setMyMsg] = useState("");
@@ -2327,7 +2326,7 @@ function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, o
 
   return (
     <div className="fade-in" style={{ padding: "22px 20px 30px" }}>
-      <div style={{ marginBottom: 14 }}><PageBack t={t} dir={dir} onClick={onBack} /></div>
+      <div style={{ marginBottom: 14 }}><PageBack t={t} dir={lang === "ar" ? "rtl" : "ltr"} onClick={onBack} /></div>
       <h2 className="rowaa-serif" style={{ fontSize: 21, color: C.ink, margin: "0 0 16px" }}>{t.notifPanelTitle}</h2>
 
       {toast && <Card style={{ background: theme.soft, marginBottom: 14, padding: 12, textAlign: "center", fontSize: 13, color: theme.deep, fontWeight: 600 }}>{toast}</Card>}
