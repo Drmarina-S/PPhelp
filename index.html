@@ -199,6 +199,11 @@ const L = {
     sleep: "Sleep log", growth: "Growth tracking", documents: "Important documents",
     comingSoonNote: "Pending clinical validation before this launches",
     notifPanelTitle: "Notifications", noNotifications: "No messages yet.",
+    ownerNoMothers: "No mothers signed up yet. They will appear here as soon as someone registers in the app.",
+    ownerNoMatch: "No mother matches this filter.",
+    ownerInboxTitle: "Messages from mothers",
+    ownerNoFeedback: "No messages from mothers yet.",
+    newMotherMsg: "New message from a mother",
     composeBroadcast: "Send a message to all users", broadcastTitlePh: "Title",
     broadcastTextPh: "Write your message…", sendToAll: "Send to everyone",
     messagesFromUsers: "Messages from users", noUserMessages: "No messages yet.",
@@ -289,6 +294,11 @@ const L = {
     sleep: "سجل النوم", growth: "متابعة النمو", documents: "مستندات مهمة",
     comingSoonNote: "بانتظار التحقق الطبي قبل الإطلاق",
     notifPanelTitle: "الإشعارات", noNotifications: "لسه مفيش رسايل.",
+    ownerNoMothers: "لسه مفيش أمهات مسجلات. هيظهروا هنا أول ما حد يسجّل في التطبيق.",
+    ownerNoMatch: "مفيش أم بيطابق الفلتر ده.",
+    ownerInboxTitle: "رسايل من الأمهات",
+    ownerNoFeedback: "لسه مفيش رسايل من الأمهات.",
+    newMotherMsg: "رسالة جديدة من أم",
     composeBroadcast: "ابعت رسالة لكل المستخدمين", broadcastTitlePh: "العنوان",
     broadcastTextPh: "اكتب رسالتك…", sendToAll: "إرسال للجميع",
     messagesFromUsers: "رسايل من المستخدمين", noUserMessages: "لسه مفيش رسايل.",
@@ -720,7 +730,9 @@ function RowaaApp() {
     const updated = [item, ...current].slice(0, 50);
     const ok = await storageSetJSON("owner-inbox", true, updated);
     if (ok && isOwner) setOwnerInbox(updated);
-    return ok;
+    // The real path is the sheet, so the owner gets it on any device.
+    const sent = await sendFeedbackToSheet(user?.phone, user?.name, text, user?.lang);
+    return ok || sent;
   }
   async function updateOwnerEmail(newEmail) {
     const ok = await storageSetJSON("owner-config", true, { email: newEmail });
@@ -1150,6 +1162,35 @@ function ownerGet(action, extra) {
       return data || { ok: false, error: "network" };
     })
     .catch(() => ({ ok: false, error: "network" }));
+}
+
+const SEEN_FEEDBACK_KEY = "pphelp_seen_feedback";
+
+function loadSeenFeedbackIds() {
+  try {
+    const raw = localStorage.getItem(SEEN_FEEDBACK_KEY);
+    const o = raw ? JSON.parse(raw) : null;
+    return o && typeof o === "object" ? o : {};
+  } catch (err) {
+    return {};
+  }
+}
+function saveSeenFeedbackIds(obj) {
+  try { localStorage.setItem(SEEN_FEEDBACK_KEY, JSON.stringify(obj || {})); } catch (err) { /* ignore */ }
+}
+
+function sendFeedbackToSheet(phone, name, text, lang) {
+  const url = getSheetWebhookUrl();
+  if (!url) return Promise.resolve(false);
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    keepalive: true,
+    body: JSON.stringify({ action: "feedback", key: normalizePhoneKey(phone), phone: phone || "", name: name || "", text: text || "", lang: lang || "ar" })
+  })
+    .then((r) => r.json())
+    .then((d) => !!(d && d.ok))
+    .catch(() => false);
 }
 
 function ownerSendBulk(keys, title, text, lang) {
@@ -1898,6 +1939,7 @@ function OwnerScreen({ t, lang, dir, onBack }) {
   const [selText, setSelText] = useState("");
   const [restTitle, setRestTitle] = useState("");
   const [restText, setRestText] = useState("");
+  const [feedback, setFeedback] = useState([]);
 
   const selectStyle = { ...inputStyle(), appearance: "none", cursor: "pointer", fontSize: 13.5 };
 
@@ -1914,6 +1956,30 @@ function OwnerScreen({ t, lang, dir, onBack }) {
     if (s && s.ok) setStats(s);
     setBusy(false);
   }
+
+  /* Poll the sheet for anything mothers wrote to the team, and raise a
+     real system notification for whatever we have not seen yet. */
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    async function pullFeedback() {
+      const res = await ownerGet("feedbackInbox");
+      if (cancelled || !res || !res.ok) return;
+      const list = res.messages || [];
+      setFeedback(list);
+      const seen = loadSeenFeedbackIds();
+      const fresh = list.filter((m) => !seen[m.id]);
+      if (!fresh.length) return;
+      const next = Object.assign({}, seen);
+      list.forEach((m) => { next[m.id] = 1; });
+      saveSeenFeedbackIds(next);
+      const first = fresh[0];
+      fireSystemAlert(t.newMotherMsg, (first.name || "") + ": " + String(first.text || "").slice(0, 90));
+    }
+    pullFeedback();
+    const iv = setInterval(pullFeedback, 20000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [authed]);
 
   useEffect(() => { if (authed) load(); }, [authed]);
 
@@ -1945,7 +2011,7 @@ function OwnerScreen({ t, lang, dir, onBack }) {
     return mothers.filter((m) => {
       if (statusFilter === "active" && m.status !== "active") return false;
       if (statusFilter === "stopped" && m.status === "active") return false;
-      if (caseFilter === "unset" ? !!m.case : m.case !== caseFilter) return false;
+      if (caseFilter === "unset" ? !!m.case : caseFilter !== "all" && m.case !== caseFilter) return false;
       if (needle) {
         const hay = ((m.name || "") + " " + (m.phone || "")).toLowerCase();
         if (hay.indexOf(needle) === -1) return false;
@@ -2091,7 +2157,13 @@ function OwnerScreen({ t, lang, dir, onBack }) {
           {visible.length === 0 ? (
             <Card style={{ textAlign: "center", padding: 22, marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: C.inkSoft }}>
-                {!getSheetWebhookUrl() ? t.ownerSheetMissing : busy ? t.ownerRefresh + "…" : t.noNotifications}
+                {!getSheetWebhookUrl()
+                  ? t.ownerSheetMissing
+                  : busy
+                    ? t.ownerRefresh + "…"
+                    : mothers.length === 0
+                      ? t.ownerNoMothers
+                      : t.ownerNoMatch}
               </div>
             </Card>
           ) : (
@@ -2147,6 +2219,29 @@ function OwnerScreen({ t, lang, dir, onBack }) {
             </PrimaryButton>
           </Card>
 
+          {/* messages from mothers */}
+          <SectionTitle>{t.ownerInboxTitle} ({feedback.length})</SectionTitle>
+          {feedback.length === 0 ? (
+            <Card style={{ textAlign: "center", padding: 18, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: C.inkSoft }}>{t.ownerNoFeedback}</div>
+            </Card>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+              {feedback.map((m) => (
+                <div key={m.id} style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink }}>{m.name || "—"}</div>
+                    <div style={{ fontSize: 11, color: C.inkFaint, whiteSpace: "nowrap", direction: "ltr" }}>{m.date}</div>
+                  </div>
+                  <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 5, lineHeight: 1.6 }}>{m.text}</div>
+                  {m.key ? (
+                    <div style={{ fontSize: 11, color: C.inkFaint, marginTop: 6, direction: "ltr", textAlign: "left" }}>{m.key}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+
           <GhostButton style={{ width: "100%", textAlign: "center" }} onClick={signOut}>{t.ownerSignOut}</GhostButton>
         </>
       )}
@@ -2189,9 +2284,9 @@ function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, o
   }
   async function doSendToOwner() {
     if (!myMsg.trim()) return;
-    await onSendToOwner(myMsg.trim());
-    setMyMsg("");
-    flash(t.messageSentToast);
+    const ok = await onSendToOwner(myMsg.trim());
+    if (ok) { setMyMsg(""); flash(t.messageSentToast); }
+    else flash(t.ownerSheetMissing);
   }
   async function doSaveEmail() {
     if (!emailDraft.trim()) return;
