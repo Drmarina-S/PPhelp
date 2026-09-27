@@ -26,6 +26,19 @@
   #boot-fallback {
     text-align: center; color: #6B655D; font-size: 14px; padding: 60px 20px;
   }
+  /* On phones: fill the screen instead of the fixed "phone card" height,
+     so nothing (e.g. the owner sign-in link) can fall below the fold. */
+  @media (max-width: 480px), (max-height: 720px) {
+    html, body { height: 100%; }
+    body { padding: 0; align-items: stretch; }
+    .rowaa-root {
+      min-height: 100vh !important;
+      min-height: 100dvh !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    .rowaa-scroll { max-height: none !important; }
+  }
 </style>
 
 <!-- Import map: lets the browser resolve bare "react" / "lucide-react" imports
@@ -650,7 +663,15 @@ function RowaaApp() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => { if (screen === "splash") goReset("welcome"); }, 1400);
+    const timer = setTimeout(() => {
+      if (screen !== "splash") return;
+      let next = "welcome";
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("owner") === "1" || window.location.hash === "#owner") next = "owner";
+      } catch (err) { /* ignore */ }
+      goReset(next);
+    }, 1400);
     return () => clearTimeout(timer);
   }, [screen]);
 
@@ -742,7 +763,7 @@ function RowaaApp() {
     return (
       <Shell dir={dir}>
         {fontStyle}
-        <div className="fade-in" style={{ padding: "36px 22px", minHeight: 560, display: "flex", flexDirection: "column" }}>
+        <div className="fade-in rowaa-scroll" style={{ padding: "36px 22px", minHeight: 560, maxHeight: 640, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 30 }}>
             <LangToggle lang={lang} setLang={setLang} />
           </div>
@@ -760,10 +781,13 @@ function RowaaApp() {
           <div>
             <PrimaryButton accent={C.roseDeep} onClick={() => { setAuthMode("signup"); go("auth"); }}>{t.getStarted}</PrimaryButton>
             <GhostButton style={{ width: "100%", textAlign: "center", marginTop: 8 }} onClick={() => { setAuthMode("login"); go("auth"); }}>{t.haveAccount}</GhostButton>
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
-              <GhostButton onClick={() => go("owner")} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: C.inkFaint }}>
-                <Lock size={13} /> {t.ownerSignInTitle}
-              </GhostButton>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+              <button
+                onClick={() => go("owner")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "10px 18px", fontSize: 13, fontWeight: 700, color: C.inkSoft, cursor: "pointer" }}
+              >
+                <Lock size={14} /> {t.ownerSignInTitle}
+              </button>
             </div>
           </div>
         </div>
@@ -787,7 +811,7 @@ function RowaaApp() {
     return (
       <Shell dir={dir}>
         {fontStyle}
-        <div className="fade-in" style={{ padding: "24px 22px", minHeight: 560, display: "flex", flexDirection: "column" }}>
+        <div className="fade-in rowaa-scroll" style={{ padding: "24px 22px", minHeight: 560, maxHeight: 640, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           <div style={{ marginBottom: 18 }}><PageBack t={t} dir={dir} onClick={goBack} /></div>
           <Sparkles color={C.roseDeep} size={26} />
           <h2 className="rowaa-serif" style={{ fontSize: 24, marginTop: 14, marginBottom: 6, color: C.ink }}>{t.onboardTitle}</h2>
