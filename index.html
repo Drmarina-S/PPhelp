@@ -1940,6 +1940,7 @@ function OwnerScreen({ t, lang, dir, onBack }) {
   const [restTitle, setRestTitle] = useState("");
   const [restText, setRestText] = useState("");
   const [feedback, setFeedback] = useState([]);
+  const [unread, setUnread] = useState(0);
 
   const selectStyle = { ...inputStyle(), appearance: "none", cursor: "pointer", fontSize: 13.5 };
 
@@ -1974,6 +1975,7 @@ function OwnerScreen({ t, lang, dir, onBack }) {
       list.forEach((m) => { next[m.id] = 1; });
       saveSeenFeedbackIds(next);
       const first = fresh[0];
+      setUnread((n) => n + fresh.length);
       fireSystemAlert(t.newMotherMsg, (first.name || "") + ": " + String(first.text || "").slice(0, 90));
     }
     pullFeedback();
@@ -2069,8 +2071,26 @@ function OwnerScreen({ t, lang, dir, onBack }) {
     <div className="fade-in" style={{ padding: "22px 20px 34px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <PageBack t={t} dir={dir} onClick={onBack} />
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: theme.deep }}>
-          <Shield size={14} /> {t.ownerConsole}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {authed && (
+            <button
+              onClick={() => {
+                const el = document.getElementById("owner-feedback");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                setUnread(0);
+              }}
+              aria-label={t.ownerInboxTitle}
+              style={{ position: "relative", background: C.ivory, border: `1.5px solid ${C.line}`, borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            >
+              <Bell size={15} color={theme.deep} />
+              {unread > 0 && (
+                <span style={{ position: "absolute", top: -3, insetInlineEnd: -3, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: C.roseDeep, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>
+              )}
+            </button>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: theme.deep }}>
+            <Shield size={14} /> {t.ownerConsole}
+          </div>
         </div>
       </div>
 
@@ -2139,9 +2159,10 @@ function OwnerScreen({ t, lang, dir, onBack }) {
             <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
               <button
                 onClick={toggleAll}
-                style={{ flex: 1, background: allVisibleSelected ? theme.soft : C.ivory, border: `1.5px solid ${theme.deep}`, color: theme.deep, borderRadius: 999, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+                disabled={busy || visible.length === 0}
+                style={{ flex: 1, background: allVisibleSelected ? theme.soft : C.ivory, border: `1.5px solid ${theme.deep}`, color: theme.deep, borderRadius: 999, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: busy || visible.length === 0 ? "default" : "pointer", opacity: busy || visible.length === 0 ? 0.5 : 1 }}
               >
-                {allVisibleSelected ? t.ownerClearSel : t.ownerSelectAll + " (" + visible.length + ")"}
+                {busy ? t.ownerRefresh + "…" : allVisibleSelected ? t.ownerClearSel : t.ownerSelectAll + " (" + visible.length + ")"}
               </button>
               <button
                 onClick={load}
@@ -2161,9 +2182,11 @@ function OwnerScreen({ t, lang, dir, onBack }) {
                   ? t.ownerSheetMissing
                   : busy
                     ? t.ownerRefresh + "…"
-                    : mothers.length === 0
+                    :             mothers.length === 0
                       ? t.ownerNoMothers
-                      : t.ownerNoMatch}
+                      : busy
+                        ? t.ownerRefresh + "…"
+                        : t.ownerNoMatch}
               </div>
             </Card>
           ) : (
@@ -2220,7 +2243,9 @@ function OwnerScreen({ t, lang, dir, onBack }) {
           </Card>
 
           {/* messages from mothers */}
-          <SectionTitle>{t.ownerInboxTitle} ({feedback.length})</SectionTitle>
+          <div id="owner-feedback">
+            <SectionTitle>{t.ownerInboxTitle} ({feedback.length})</SectionTitle>
+          </div>
           {feedback.length === 0 ? (
             <Card style={{ textAlign: "center", padding: 18, marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: C.inkSoft }}>{t.ownerNoFeedback}</div>
