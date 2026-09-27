@@ -55,7 +55,7 @@ import {
   ChevronRight, ChevronLeft, Plus, Check, X, Search, MessageCircle,
   Feather, Sparkles, Bell, Shield, LogOut, ArrowRight, ArrowLeft,
   Baby, Wind, Droplet, Moon, Calendar, ClipboardList, ChevronDown,
-  Stethoscope, BadgeCheck, Clock, Sunrise
+  Stethoscope, BadgeCheck, Clock, Sunrise, Users, Send, Lock
 } from "lucide-react";
 
 /* ============================================================
@@ -199,6 +199,22 @@ const L = {
     alertsOff: "Alerts are blocked in your browser settings.", newAlertTitle: "New message from pphelp",
     teamMessages: "Messages from the team", noTeamMessages: "No messages from the team yet.",
     install: "Install", installHint: "Open your browser menu and choose \"Add to Home Screen\".",
+    myCase: "My baby's situation", myCaseDesc: "This helps the team send you the right support.",
+    caseInNicu: "In the NICU", caseAtHome: "At home with me", caseFollowUp: "Follow-up care",
+    caseLossHome: "I lost my baby at home", caseLossNicu: "I lost my baby in the NICU",
+    caseLossOther: "I lost my baby (elsewhere)",
+    ownerConsole: "Owner console", ownerConsoleHint: "Cases, mothers and messages",
+    ownerSignInTitle: "Owner sign in", ownerPasswordLabel: "Owner password",
+    ownerSignIn: "Sign in", ownerSignOut: "Sign out", ownerWrongPassword: "Wrong password. Try again.",
+    ownerSheetMissing: "Connect the Google Sheet first (set SHEET_WEBHOOK_URL in index.html).",
+    ownerSummary: "Summary", ownerTotal: "Total", ownerActive: "Active", ownerPaused: "Paused",
+    ownerFilterCase: "Filter by case", ownerFilterStatus: "Status", ownerAll: "All", ownerAllCases: "All cases",
+    ownerSearchPh: "Search name or phone", ownerSelectAll: "Select all", ownerClearSel: "Clear selection",
+    ownerSelected: "selected", ownerNotSelected: "not selected",
+    ownerMsgSelected: "Message for the selected mothers", ownerMsgRest: "Message for everyone else",
+    ownerSendSelected: "Send to selected", ownerSendRest: "Send to the rest",
+    ownerSentTo: "Sent to ", ownerMothers: "mothers", ownerLastEmail: "Last email",
+    ownerJourney: "Journey", ownerNoCase: "No case set", ownerRefresh: "Refresh", ownerOnlyNote: "For the pphelp owner only.",
   },
   ar: {
     appName: "pphelp", tagline: "كل بداية مبكرة تستحق رعاية واحتضان.",
@@ -273,6 +289,22 @@ const L = {
     alertsOff: "التنبيه متوقف من إعدادات المتصفح.", newAlertTitle: "رسالة جديدة من pphelp",
     teamMessages: "رسايل من الفريق", noTeamMessages: "لسه مفيش رسايل من الفريق.",
     install: "تثبيت", installHint: "افتحي قائمة المتصفح واختاري \"إضافة إلى الشاشة الرئيسية\".",
+    myCase: "حالة طفلي", myCaseDesc: "ده بيساعد الفريق يبعتلكي الدعم المناسب.",
+    caseInNicu: "في الحضانة", caseAtHome: "في البيت معايا", caseFollowUp: "تحت المتابعة",
+    caseLossHome: "فقدت الحنين في البيت", caseLossNicu: "فقدت الحنين في الحضانة",
+    caseLossOther: "فقدت الحنين (مكان تاني)",
+    ownerConsole: "غرفة الأونر", ownerConsoleHint: "الحالات والأمهات والرسايل",
+    ownerSignInTitle: "دخول الأونر", ownerPasswordLabel: "باسورد الأونر",
+    ownerSignIn: "دخول", ownerSignOut: "خروج", ownerWrongPassword: "الباسورد غلط، جربي تاني.",
+    ownerSheetMissing: "لازم تربطي Google Sheet الأول (تعبئي SHEET_WEBHOOK_URL في index.html).",
+    ownerSummary: "ملخص", ownerTotal: "الإجمالي", ownerActive: "نشطة", ownerPaused: "موقوفة",
+    ownerFilterCase: "فلترة حسب الحالة", ownerFilterStatus: "الحالة", ownerAll: "الكل", ownerAllCases: "كل الحالات",
+    ownerSearchPh: "ابحثي بالاسم أو الرقم", ownerSelectAll: "تحديد الكل", ownerClearSel: "إلغاء التحديد",
+    ownerSelected: "محددة", ownerNotSelected: "غير محددة",
+    ownerMsgSelected: "رسالة للأمهات المحددات", ownerMsgRest: "رسالة للباقي",
+    ownerSendSelected: "إرسال للمحددات", ownerSendRest: "إرسال للباقي",
+    ownerSentTo: "اتبعتت لـ ", ownerMothers: "أم", ownerLastEmail: "آخر إيميل",
+    ownerJourney: "الرحلة", ownerNoCase: "من غير حالة", ownerRefresh: "تحديث", ownerOnlyNote: "دي لوحة الأونر فقط.",
   },
 };
 
@@ -472,6 +504,7 @@ function RowaaApp() {
   const [activeTab, setActiveTab] = useState("home");
   const [user, setUser] = useState(null);
   const [journalEntries, setJournalEntries] = useState([]);
+  const [caseType, setCaseType] = useState("");
   const [myQuestions, setMyQuestions] = useState([
     { id: "q1", cat: "feeding", text: { en: "How many ml is my baby taking per feed?", ar: "طفلي بياخد قد إيه (مل) كل رضعة؟" }, answered: false },
   ]);
@@ -566,6 +599,17 @@ function RowaaApp() {
   async function sendToMother(phone, title, text) {
     const res = await pushMessageToSheet(phone, title, text, "pphelp", lang);
     return !!(res && res.ok);
+  }
+
+  useEffect(() => {
+    if (!user) { setCaseType(""); return; }
+    setCaseType(loadCaseForPhone(user.phone));
+  }, [user]);
+
+  function changeCase(next) {
+    setCaseType(next);
+    saveCaseForPhone(user?.phone, next);
+    logCustomerToSheet({ ...user, journeyType: journey, caseType: next, lang }, "journey");
   }
 
   useEffect(() => {
@@ -716,6 +760,18 @@ function RowaaApp() {
     );
   }
 
+  /* ---------- OWNER CONSOLE ---------- */
+  if (screen === "owner") {
+    return (
+      <Shell dir={dir}>
+        {fontStyle}
+        <div className="rowaa-scroll" style={{ minHeight: 560, maxHeight: 640, overflowY: "auto" }}>
+          <OwnerScreen t={t} lang={lang} dir={dir} onBack={() => { setScreen("app"); setShowNotif(false); }} />
+        </div>
+      </Shell>
+    );
+  }
+
   /* ---------- MAIN APP ---------- */
   return (
     <Shell dir={dir}>
@@ -746,7 +802,7 @@ function RowaaApp() {
             broadcasts={broadcasts} ownerInbox={ownerInbox} ownerEmail={ownerEmail} inbox={inbox}
             onBack={() => setShowNotif(false)}
             onSendBroadcast={sendBroadcast} onSendToOwner={sendToOwner} onUpdateOwnerEmail={updateOwnerEmail}
-            onSendToMother={sendToMother} />
+            onSendToMother={sendToMother} onOpenOwner={() => { setShowNotif(false); setScreen("owner"); }} />
         )}
         {activeTab === "journey" && (
           <JourneyTab t={t} lang={lang} journey={journey} theme={theme}
@@ -765,7 +821,9 @@ function RowaaApp() {
         )}
         {activeTab === "profile" && (
           <ProfileTab t={t} lang={lang} setLang={setLang} journey={journey} setJourney={setJourney} isOwner={isOwner}
+            caseType={caseType} onCaseChange={changeCase}
             theme={theme} notif={notif} setNotif={setNotif} user={user}
+            onOpenOwner={() => setScreen("owner")}
             onLogout={() => { setUser(null); setJourney(null); setScreen("welcome"); setActiveTab("home"); }} />
         )}
       </div>
@@ -942,6 +1000,117 @@ function fireSystemAlert(title, body) {
   }
 }
 
+/* ============================================================
+   CASE TYPES (must stay in sync with CASE_KEYS in Code.gs)
+   ============================================================ */
+const CASE_KEYS = ["in_nicu", "at_home", "follow_up", "loss_home", "loss_nicu", "loss_other"];
+
+function caseLabel(t, key) {
+  const map = {
+    in_nicu: t.caseInNicu, at_home: t.caseAtHome, follow_up: t.caseFollowUp,
+    loss_home: t.caseLossHome, loss_nicu: t.caseLossNicu, loss_other: t.caseLossOther,
+  };
+  return map[key] || "";
+}
+
+function journeyLabel(t, key) {
+  const map = { nicu: t.nicuTitle, home: t.homeTitle, loss: t.lossTitle, later: t.laterTitle };
+  return map[key] || "";
+}
+
+const CASE_STORE_KEY = "pphelp_cases";
+
+function loadCaseMap() {
+  try {
+    const raw = localStorage.getItem(CASE_STORE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function loadCaseForPhone(phone) {
+  const map = loadCaseMap();
+  return map[normalizePhoneKey(phone)] || "";
+}
+
+function saveCaseForPhone(phone, caseKey) {
+  const key = normalizePhoneKey(phone);
+  if (!key) return;
+  const map = loadCaseMap();
+  map[key] = caseKey || "";
+  try { localStorage.setItem(CASE_STORE_KEY, JSON.stringify(map)); } catch (err) { /* ignore */ }
+}
+
+/* ============================================================
+   OWNER API (password -> token, token -> mothers list / bulk)
+   ============================================================ */
+const OWNER_TOKEN_KEY = "pphelp_owner_token";
+
+function loadOwnerToken() {
+  try { return localStorage.getItem(OWNER_TOKEN_KEY) || ""; } catch (err) { return ""; }
+}
+
+function saveOwnerToken(token) {
+  try {
+    if (token) localStorage.setItem(OWNER_TOKEN_KEY, token);
+    else localStorage.removeItem(OWNER_TOKEN_KEY);
+  } catch (err) { /* ignore */ }
+}
+
+function ownerLogin(password) {
+  const url = getSheetWebhookUrl();
+  if (!url) return Promise.resolve({ ok: false, error: "no_sheet" });
+  return fetch(`${url}?action=login&password=${encodeURIComponent(password || "")}`)
+    .then((r) => r.json())
+    .then((data) => {
+      if (data && data.ok && data.token) saveOwnerToken(data.token);
+      return data || { ok: false, error: "network" };
+    })
+    .catch(() => ({ ok: false, error: "network" }));
+}
+
+function ownerGet(action, extra) {
+  const url = getSheetWebhookUrl();
+  const token = loadOwnerToken();
+  if (!url) return Promise.resolve({ ok: false, error: "no_sheet" });
+  if (!token) return Promise.resolve({ ok: false, error: "unauthorized" });
+  const qs = new URLSearchParams(Object.assign({ action: action, token: token }, extra || {}));
+  return fetch(`${url}?${qs.toString()}`)
+    .then((r) => r.json())
+    .then((data) => {
+      if (data && data.error === "unauthorized") saveOwnerToken("");
+      return data || { ok: false, error: "network" };
+    })
+    .catch(() => ({ ok: false, error: "network" }));
+}
+
+function ownerSendBulk(keys, title, text, lang) {
+  const url = getSheetWebhookUrl();
+  const token = loadOwnerToken();
+  if (!url) return Promise.resolve({ ok: false, error: "no_sheet" });
+  if (!token) return Promise.resolve({ ok: false, error: "unauthorized" });
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "pushBulk",
+      owner_token: token,
+      keys: (keys || []).join(","),
+      title: title || "",
+      text: text || "",
+      lang: lang || "en",
+      channel: "app",
+    }),
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (data && data.error === "unauthorized") saveOwnerToken("");
+      return data || { ok: false, error: "network" };
+    })
+    .catch(() => ({ ok: false, error: "network" }));
+}
+
 function logCustomerToSheet(data, action) {
   const url = getSheetWebhookUrl();
   if (!url) return;
@@ -953,6 +1122,7 @@ function logCustomerToSheet(data, action) {
     phone: data.phone || "",
     email: data.email || "",
     journey: data.journeyType || "",
+    "case": data.caseType || "",
     lang: data.lang || "",
     source: "pphelp-app",
   };
@@ -1638,10 +1808,292 @@ function JournalTool({ t, lang, theme, journey, entries, setEntries, onBack }) {
 }
 
 /* ============================================================
+   OWNER CONSOLE — password sign-in against Apps Script, then
+   the mothers list with case filters, select-all, and two bulk
+   messages: one for the selection, one for everyone else.
+   ============================================================ */
+function OwnerScreen({ t, lang, dir, onBack }) {
+  const Back = dir === "rtl" ? ArrowRight : ArrowLeft;
+  const theme = JOURNEY_THEME.home;
+
+  const [authed, setAuthed] = useState(!!loadOwnerToken());
+  const [pass, setPass] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [toast, setToast] = useState("");
+  const [mothers, setMothers] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [caseFilter, setCaseFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(() => new Set());
+  const [selTitle, setSelTitle] = useState("");
+  const [selText, setSelText] = useState("");
+  const [restTitle, setRestTitle] = useState("");
+  const [restText, setRestText] = useState("");
+
+  const selectStyle = { ...inputStyle(), appearance: "none", cursor: "pointer", fontSize: 13.5 };
+
+  function flash(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  async function load() {
+    setBusy(true);
+    const [m, s] = await Promise.all([ownerGet("mothers"), ownerGet("stats")]);
+    if (m && m.ok) setMothers(m.mothers || []);
+    else if (m && m.error === "unauthorized") { saveOwnerToken(""); setAuthed(false); }
+    if (s && s.ok) setStats(s);
+    setBusy(false);
+  }
+
+  useEffect(() => { if (authed) load(); }, [authed]);
+
+  async function signIn() {
+    setBusy(true);
+    setErr("");
+    const res = await ownerLogin(pass);
+    setBusy(false);
+    if (res && res.ok) { setAuthed(true); setPass(""); }
+    else if (res && res.error === "no_sheet") setErr(t.ownerSheetMissing);
+    else setErr(t.ownerWrongPassword);
+  }
+
+  function signOut() {
+    saveOwnerToken("");
+    setAuthed(false);
+    setMothers([]);
+    setSel(new Set());
+  }
+
+  const caseCounts = useMemo(() => {
+    const out = {};
+    mothers.forEach((m) => { const k = m.case || "unset"; out[k] = (out[k] || 0) + 1; });
+    return out;
+  }, [mothers]);
+
+  const visible = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return mothers.filter((m) => {
+      if (statusFilter === "active" && m.status !== "active") return false;
+      if (statusFilter === "stopped" && m.status === "active") return false;
+      if (caseFilter === "unset" ? !!m.case : m.case !== caseFilter) return false;
+      if (needle) {
+        const hay = ((m.name || "") + " " + (m.phone || "")).toLowerCase();
+        if (hay.indexOf(needle) === -1) return false;
+      }
+      return true;
+    });
+  }, [mothers, caseFilter, statusFilter, q]);
+
+  const selectedKeys = useMemo(() => Array.from(sel), [sel]);
+  const restKeys = useMemo(
+    () => mothers.filter((m) => m.status === "active" && !sel.has(m.key)).map((m) => m.key),
+    [mothers, sel]
+  );
+  const allVisibleSelected = visible.length > 0 && visible.every((m) => sel.has(m.key));
+
+  function toggleAll() {
+    const keys = visible.map((m) => m.key);
+    setSel((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) keys.forEach((k) => next.delete(k));
+      else keys.forEach((k) => next.add(k));
+      return next;
+    });
+  }
+
+  function toggleOne(key) {
+    setSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function send(keys, title, text, after) {
+    if (!keys.length) return;
+    if (!text.trim()) return;
+    setBusy(true);
+    const res = await ownerSendBulk(keys, title.trim(), text.trim(), lang);
+    setBusy(false);
+    if (res && res.ok) {
+      flash(t.ownerSentTo + (res.sent || keys.length) + " " + t.ownerMothers);
+      if (after) after();
+      load();
+    } else if (res && res.error === "unauthorized") {
+      saveOwnerToken("");
+      setAuthed(false);
+      setErr(t.ownerWrongPassword);
+    } else {
+      flash(t.ownerSheetMissing);
+    }
+  }
+
+  return (
+    <div className="fade-in" style={{ padding: "22px 20px 34px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <GhostButton onClick={onBack} style={{ padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Back size={15} /> {t.back}
+        </GhostButton>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: theme.deep }}>
+          <Shield size={14} /> {t.ownerConsole}
+        </div>
+      </div>
+
+      {toast && (
+        <Card style={{ background: theme.soft, marginBottom: 12, padding: 12, textAlign: "center", fontSize: 13, color: theme.deep, fontWeight: 600 }}>
+          {toast}
+        </Card>
+      )}
+
+      {/* ---------- SIGN IN ---------- */}
+      {!authed && (
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <Lock size={18} color={theme.deep} />
+            <div className="rowaa-serif" style={{ fontSize: 19, color: C.ink }}>{t.ownerSignInTitle}</div>
+          </div>
+          <p style={{ fontSize: 12.5, color: C.inkSoft, margin: "0 0 16px" }}>{t.ownerOnlyNote}</p>
+          <Field label={t.ownerPasswordLabel}>
+            <input
+              type="password"
+              style={inputStyle()}
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
+              autoCapitalize="none"
+            />
+          </Field>
+          {err && <div style={{ color: C.warn, fontSize: 12, marginTop: -8, marginBottom: 10 }}>{err}</div>}
+          <PrimaryButton accent={theme.deep} disabled={busy} onClick={signIn}>{t.ownerSignIn}</PrimaryButton>
+        </Card>
+      )}
+
+      {/* ---------- DASHBOARD ---------- */}
+      {authed && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[
+              { label: t.ownerTotal, value: stats ? stats.total : mothers.length },
+              { label: t.ownerActive, value: stats ? stats.active : "—" },
+              { label: t.ownerPaused, value: stats ? Math.max(0, (stats.total || 0) - (stats.active || 0)) : "—" },
+            ].map((s) => (
+              <Card key={s.label} style={{ flex: 1, padding: 12, textAlign: "center" }}>
+                <div className="rowaa-serif" style={{ fontSize: 21, color: theme.deep }}>{s.value}</div>
+                <div style={{ fontSize: 10.5, color: C.inkFaint, fontWeight: 600 }}>{s.label}</div>
+              </Card>
+            ))}
+          </div>
+
+          {/* filters */}
+          <Card style={{ marginBottom: 14, padding: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <select style={selectStyle} value={caseFilter} onChange={(e) => setCaseFilter(e.target.value)}>
+                <option value="all">{t.ownerAllCases}</option>
+                {CASE_KEYS.map((k) => (
+                  <option key={k} value={k}>{caseLabel(t, k)}{caseCounts[k] ? " (" + caseCounts[k] + ")" : ""}</option>
+                ))}
+                <option value="unset">{t.ownerNoCase} ({caseCounts.unset || 0})</option>
+              </select>
+              <select style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="active">{t.ownerActive}</option>
+                <option value="stopped">{t.ownerPaused}</option>
+                <option value="all">{t.ownerAll}</option>
+              </select>
+            </div>
+            <input style={inputStyle()} placeholder={t.ownerSearchPh} value={q} onChange={(e) => setQ(e.target.value)} inputMode="search" />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+              <button
+                onClick={toggleAll}
+                style={{ flex: 1, background: allVisibleSelected ? theme.soft : C.ivory, border: `1.5px solid ${theme.deep}`, color: theme.deep, borderRadius: 999, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+              >
+                {allVisibleSelected ? t.ownerClearSel : t.ownerSelectAll + " (" + visible.length + ")"}
+              </button>
+              <button
+                onClick={load}
+                style={{ background: C.ivory, border: `1.5px solid ${C.line}`, color: C.inkSoft, borderRadius: 999, padding: "9px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+              >
+                {t.ownerRefresh}
+              </button>
+            </div>
+          </Card>
+
+          {/* mothers list */}
+          <SectionTitle>{t.ownerMothers} ({visible.length}/{mothers.length})</SectionTitle>
+          {visible.length === 0 ? (
+            <Card style={{ textAlign: "center", padding: 22, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: C.inkSoft }}>
+                {!getSheetWebhookUrl() ? t.ownerSheetMissing : busy ? t.ownerRefresh + "…" : t.noNotifications}
+              </div>
+            </Card>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+              {visible.map((m) => {
+                const on = sel.has(m.key);
+                return (
+                  <div
+                    key={m.key}
+                    onClick={() => toggleOne(m.key)}
+                    style={{ display: "flex", gap: 10, alignItems: "flex-start", background: on ? theme.soft : C.card, border: `1.5px solid ${on ? theme.deep : C.line}`, borderRadius: 16, padding: 12, cursor: "pointer" }}
+                  >
+                    <input type="checkbox" checked={on} readOnly style={{ marginTop: 2, accentColor: theme.deep, width: 17, height: 17 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink }}>{m.name || "—"}</div>
+                        <div style={{ fontSize: 11, color: C.inkFaint, whiteSpace: "nowrap", direction: "ltr" }}>{m.phone}</div>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                        {m.case ? <Pill tone="beige">{caseLabel(t, m.case)}</Pill> : <Pill tone="beige">{t.ownerNoCase}</Pill>}
+                        {m.journey && <Pill tone="sage">{journeyLabel(t, m.journey)}</Pill>}
+                        {m.status !== "active" && <Pill tone="rose">{t.ownerPaused}</Pill>}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: C.inkFaint, marginTop: 6 }}>
+                        {t.ownerLastEmail}: {m.last_sent || "—"} · {m.send_count || 0} {t.ownerMothers}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* message A — selected */}
+          <SectionTitle>{t.ownerMsgSelected} ({selectedKeys.length} {t.ownerSelected})</SectionTitle>
+          <Card style={{ marginBottom: 16 }}>
+            <input style={{ ...inputStyle(), marginBottom: 8 }} placeholder={t.broadcastTitlePh} value={selTitle} onChange={(e) => setSelTitle(e.target.value)} />
+            <textarea style={{ ...inputStyle(), minHeight: 76, resize: "vertical", marginBottom: 10 }} placeholder={t.broadcastTextPh} value={selText} onChange={(e) => setSelText(e.target.value)} />
+            <PrimaryButton accent={theme.deep} disabled={busy || !selectedKeys.length || !selText.trim()} onClick={() => send(selectedKeys, selTitle, selText, () => setSelText(""))}>
+              <Send size={15} style={{ verticalAlign: "-2px", marginInlineEnd: 6 }} />
+              {t.ownerSendSelected} ({selectedKeys.length})
+            </PrimaryButton>
+          </Card>
+
+          {/* message B — everyone else */}
+          <SectionTitle>{t.ownerMsgRest} ({restKeys.length} {t.ownerNotSelected})</SectionTitle>
+          <Card style={{ marginBottom: 16 }}>
+            <input style={{ ...inputStyle(), marginBottom: 8 }} placeholder={t.broadcastTitlePh} value={restTitle} onChange={(e) => setRestTitle(e.target.value)} />
+            <textarea style={{ ...inputStyle(), minHeight: 76, resize: "vertical", marginBottom: 10 }} placeholder={t.broadcastTextPh} value={restText} onChange={(e) => setRestText(e.target.value)} />
+            <PrimaryButton accent={C.roseDeep} disabled={busy || !restKeys.length || !restText.trim()} onClick={() => send(restKeys, restTitle, restText, () => setRestText(""))}>
+              <Send size={15} style={{ verticalAlign: "-2px", marginInlineEnd: 6 }} />
+              {t.ownerSendRest} ({restKeys.length})
+            </PrimaryButton>
+          </Card>
+
+          <GhostButton style={{ width: "100%", textAlign: "center" }} onClick={signOut}>{t.ownerSignOut}</GhostButton>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    NOTIFICATIONS PANEL — broadcasts from the owner to everyone,
    plus (owner-only) a compose box and inbox of user messages.
    ============================================================ */
-function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, ownerEmail, inbox = [], onBack, onSendBroadcast, onSendToOwner, onUpdateOwnerEmail, onSendToMother }) {
+function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, ownerEmail, inbox = [], onBack, onSendBroadcast, onSendToOwner, onUpdateOwnerEmail, onSendToMother, onOpenOwner }) {
   const Back = lang === "ar" ? ArrowRight : ArrowLeft;
   const [bTitle, setBTitle] = useState("");
   const [bText, setBText] = useState("");
@@ -1733,6 +2185,16 @@ function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, o
         <>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.inkFaint, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 }}>{t.ownerTools}</div>
           <Card style={{ marginBottom: 14 }}>
+            <button onClick={onOpenOwner} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: theme.soft, border: `1.5px solid ${theme.deep}`, borderRadius: 16, padding: 14, cursor: "pointer" }}>
+              <Users size={17} color={theme.deep} />
+              <div style={{ flex: 1, textAlign: "start" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: theme.deep }}>{t.ownerConsole}</div>
+                <div style={{ fontSize: 11.5, color: C.inkSoft }}>{t.ownerConsoleHint}</div>
+              </div>
+              <ChevronRight size={16} color={theme.deep} style={{ transform: lang === "ar" ? "scaleX(-1)" : "none" }} />
+            </button>
+          </Card>
+          <Card style={{ marginBottom: 14 }}>
             <Field label={t.oneMotherTitle}>
               <input style={{ ...inputStyle(), marginBottom: 8 }} placeholder={t.targetPhonePh} value={mPhone} onChange={(e) => setMPhone(e.target.value)} inputMode="tel" />
               <input style={{ ...inputStyle(), marginBottom: 8 }} placeholder={t.broadcastTitlePh} value={mTitle} onChange={(e) => setMTitle(e.target.value)} />
@@ -1814,7 +2276,7 @@ function NotificationsPanel({ t, lang, theme, isOwner, broadcasts, ownerInbox, o
 /* ============================================================
    PROFILE TAB
    ============================================================ */
-function ProfileTab({ t, lang, setLang, journey, setJourney, theme, notif, setNotif, user, onLogout, isOwner }) {
+function ProfileTab({ t, lang, setLang, journey, setJourney, theme, notif, setNotif, user, onLogout, isOwner, caseType, onCaseChange, onOpenOwner }) {
   const name = user?.name || "Sara";
   return (
     <div style={{ padding: "26px 20px 10px" }} className="fade-in">
@@ -1835,12 +2297,29 @@ function ProfileTab({ t, lang, setLang, journey, setJourney, theme, notif, setNo
       <Card style={{ marginBottom: 22 }}>
         <div style={{ display: "flex", gap: 10 }}>
           {[{ k: "nicu", label: t.nicuTitle }, { k: "home", label: t.homeTitle }, { k: "loss", label: t.lossTitle }].map((j) => (
-            <button key={j.k} onClick={() => { setJourney(j.k); logCustomerToSheet({ ...user, journeyType: j.k, lang }, "journey"); }} style={{ flex: 1, padding: "10px 4px", borderRadius: 14, border: `1.5px solid ${journey === j.k ? theme.deep : C.line}`, background: journey === j.k ? theme.soft : "transparent", fontSize: 11.5, fontWeight: 600, color: journey === j.k ? theme.deep : C.inkSoft, cursor: "pointer" }}>
+            <button key={j.k} onClick={() => { setJourney(j.k); logCustomerToSheet({ ...user, journeyType: j.k, caseType, lang }, "journey"); }} style={{ flex: 1, padding: "10px 4px", borderRadius: 14, border: `1.5px solid ${journey === j.k ? theme.deep : C.line}`, background: journey === j.k ? theme.soft : "transparent", fontSize: 11.5, fontWeight: 600, color: journey === j.k ? theme.deep : C.inkSoft, cursor: "pointer" }}>
               {j.label}
             </button>
           ))}
         </div>
       </Card>
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.inkFaint, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 }}>{t.myCase}</div>
+      <Card style={{ marginBottom: 10 }}>
+        <select
+          value={caseType}
+          onChange={(e) => onCaseChange(e.target.value)}
+          style={{ ...inputStyle(), appearance: "none", cursor: "pointer" }}
+        >
+          <option value="">{t.ownerNoCase}</option>
+          {CASE_KEYS.map((k) => <option key={k} value={k}>{caseLabel(t, k)}</option>)}
+        </select>
+        <div style={{ fontSize: 11.5, color: C.inkFaint, marginTop: 8 }}>{t.myCaseDesc}</div>
+      </Card>
+
+      <div style={{ height: 12 }} />
+
+      <SettingsRow icon={Shield} label={t.ownerConsole} value={t.ownerConsoleHint} onClick={onOpenOwner} />
 
       <SettingsRow icon={Globe} label={t.language} value={lang === "en" ? "English" : "العربية"} onClick={() => setLang(lang === "en" ? "ar" : "en")} />
       <SettingsGroup title={t.notifications}>
